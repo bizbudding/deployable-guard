@@ -1,0 +1,61 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * deployable-guard CLI.
+ *
+ *   deployable-guard check [--root=PATH]     Verify the committed autoloader is deployable (exit 1 if not).
+ *   deployable-guard install-hook [--root=PATH]  Install the pre-commit hook + set core.hooksPath.
+ *
+ * Self-bootstraps: prefers a composer autoloader (installed as a dependency, or
+ * this package's own vendor/), else requires src/ directly so it runs standalone
+ * in CI against a committed tree with no `composer install`.
+ */
+
+( static function ( array $argv ): void {
+	$autoload = null;
+	foreach ( [ __DIR__ . '/../vendor/autoload.php', __DIR__ . '/../../../autoload.php' ] as $candidate ) {
+		if ( is_file( $candidate ) ) {
+			$autoload = $candidate;
+			break;
+		}
+	}
+
+	if ( $autoload ) {
+		require $autoload;
+	} else {
+		require __DIR__ . '/../src/DeployableChecker.php';
+		require __DIR__ . '/../src/HookInstaller.php';
+	}
+
+	$cmd  = $argv[1] ?? 'check';
+	$root = getcwd();
+	foreach ( array_slice( $argv, 2 ) as $arg ) {
+		if ( str_starts_with( $arg, '--root=' ) ) {
+			$root = substr( $arg, 7 );
+		}
+	}
+
+	switch ( $cmd ) {
+		case 'check':
+			$missing = ( new Mai\DeployableGuard\DeployableChecker( $root ) )->missing();
+			if ( $missing ) {
+				fwrite( STDERR, "\xE2\x9C\x96 Committed autoloader references files that are NOT git-tracked (not deployable as-is):\n" );
+				foreach ( $missing as $rel ) {
+					fwrite( STDERR, "  - {$rel}\n" );
+				}
+				fwrite( STDERR, "\nRegenerate without dev deps and commit:\n  composer dump-autoload --no-dev\n" );
+				exit( 1 );
+			}
+			echo "OK: committed autoloader is deployable as-is.\n";
+			exit( 0 );
+
+		case 'install-hook':
+			( new Mai\DeployableGuard\HookInstaller( $root ) )->install();
+			exit( 0 );
+
+		default:
+			fwrite( STDERR, "Usage: deployable-guard [check|install-hook] [--root=PATH]\n" );
+			exit( 2 );
+	}
+} )( $argv );
