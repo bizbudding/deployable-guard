@@ -58,4 +58,21 @@ final class HookIntegrationTest extends TestCase {
 		exec( 'git -C ' . escapeshellarg( $this->root ) . ' add vendor/composer/autoload_files.php' );
 		self::assertNotSame( 0, $this->commit( 'polluted' ), 'dev-polluted autoloader must be blocked' );
 	}
+
+	public function test_missing_binary_skips_instead_of_blocking(): void {
+		( new HookInstaller( $this->root ) )->install();
+
+		// Simulate a consumer `composer install --no-dev`: the dev-only binary is gone.
+		unlink( $this->root . '/vendor/bin/deployable-guard' );
+
+		// A dev-polluted autoloader would normally be blocked, but with the binary
+		// absent the hook must fail open (skip) rather than error out and false-block.
+		file_put_contents( $this->root . '/vendor/dev.php', '<?php' );
+		file_put_contents(
+			$this->root . '/vendor/composer/autoload_files.php',
+			'<?php return ' . var_export( [ 'x' => $this->root . '/vendor/dev.php' ], true ) . ';'
+		);
+		exec( 'git -C ' . escapeshellarg( $this->root ) . ' add vendor/composer/autoload_files.php' );
+		self::assertSame( 0, $this->commit( 'no-binary' ), 'missing binary must skip the check, not block the commit' );
+	}
 }
