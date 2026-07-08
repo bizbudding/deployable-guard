@@ -44,7 +44,7 @@ final class HookInstaller {
 	}
 
 	private const HOOK = "#!/bin/sh\n"
-		. "# Managed by bizbudding/deployable-guard — regenerated on composer install; do not edit.\n"
+		. "# Managed by bizbudding/deployable-guard, regenerated on composer install. Do not edit.\n"
 		. "if git diff --cached --name-only | grep -q '^vendor/composer/'; then\n"
 		. "\tguard=\"\$(git rev-parse --show-toplevel)/vendor/bin/deployable-guard\"\n"
 		. "\t# Dev-only binary; if it is absent (e.g. after composer install --no-dev) skip the local check. CI is the hard gate.\n"

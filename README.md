@@ -4,7 +4,7 @@ Verify a committed composer autoloader is deployable as a **raw git tree**.
 
 These plugins deploy by checking out / copying a branch with no composer build on the server, so the committed `vendor/` must be self-consistent: every file `vendor/composer/autoload_files.php` eagerly `require()`s must be **git-tracked**. If that autoloader was regenerated with dev dependencies installed, it references dev-only packages that `.gitignore` excludes from the commit, and a raw-branch deploy then fatals on load.
 
-`deployable-guard` checks exactly that — against **git-tracked status**, not `file_exists` (dev files are physically present locally but gitignored, so `file_exists` would false-pass). It also self-installs a pre-commit hook and provides a CI check.
+`deployable-guard` checks exactly that against **git-tracked status**, not `file_exists` (dev files are physically present locally but gitignored, so `file_exists` would false-pass). It also self-installs a pre-commit hook and provides a CI check.
 
 ## Install (in a plugin that commits its vendor tree)
 
@@ -29,7 +29,7 @@ Add the VCS repository and require it as a dev dependency:
 
 ## CI (the hard gate)
 
-Copy `templates/deployable.yml` to `.github/workflows/deployable.yml`. It checks out the committed tree (no composer build — exactly what a raw deploy sees), checks out this tool pinned to `v1`, and runs the check.
+Copy `templates/deployable.yml` to `.github/workflows/deployable.yml`. It checks out the committed tree (no composer build, exactly what a raw deploy sees), checks out this tool pinned to `v1`, and runs the check.
 
 ## CLI
 
