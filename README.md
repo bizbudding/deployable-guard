@@ -27,6 +27,15 @@ Add the VCS repository and require it as a dev dependency:
 
 `composer install` then installs a `.githooks/pre-commit` (gitignored, regenerated on every install/update) that runs the check when `vendor/composer/` is staged, and points `core.hooksPath` at it. Override a block intentionally with `git commit --no-verify`.
 
+## Adopt in a plugin (step by step)
+
+1. Add the VCS repo, the `require-dev` entry, and the `post-install`/`post-update` scripts to `composer.json` (snippet above).
+2. Run `composer update bizbudding/deployable-guard`. This installs it, writes the lock, and runs `install-hook`, which sets `core.hooksPath=.githooks` and appends `.githooks/` to `.gitignore`.
+3. Run `composer dump-autoload --no-dev` to regenerate the committed production autoloader.
+4. Copy `templates/deployable.yml` to `.github/workflows/deployable.yml`.
+5. Verify with `php vendor/bin/deployable-guard check`. It should print `OK: committed autoloader is deployable as-is.`
+6. Commit `composer.json`, `composer.lock`, the workflow, the `.gitignore` change, and, if you commit `vendor/`, `vendor/composer/installed.json` and `vendor/composer/installed.php`. Do not commit `vendor/bizbudding/` or `vendor/bin/`, which stay gitignored as dev-only.
+
 ## CI (the hard gate)
 
 Copy `templates/deployable.yml` to `.github/workflows/deployable.yml`. It checks out the committed tree (no composer build, exactly what a raw deploy sees), checks out this tool pinned to `v1`, and runs the check.
