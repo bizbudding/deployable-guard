@@ -19,11 +19,13 @@ Add the VCS repository and require it as a dev dependency:
         "bizbudding/deployable-guard": "^1"
     },
     "scripts": {
-        "post-install-cmd": [ "@php vendor/bin/deployable-guard install-hook" ],
-        "post-update-cmd":  [ "@php vendor/bin/deployable-guard install-hook" ]
+        "post-install-cmd": [ "sh -c 'test -f vendor/bin/deployable-guard && php vendor/bin/deployable-guard install-hook || true'" ],
+        "post-update-cmd":  [ "sh -c 'test -f vendor/bin/deployable-guard && php vendor/bin/deployable-guard install-hook || true'" ]
     }
 }
 ```
+
+The `test -f` guard is load-bearing: under `composer install --no-dev` (CI / raw-tree deploy) the dev-only guard bin is absent, so a bare `@php vendor/bin/deployable-guard install-hook` would fail with "Could not open input file" and abort the install. The guard makes it a no-op when the bin isn't there. (Do **not** add a `scripts-no-dev` key to work around this — it is not a real Composer property and fails `composer validate --strict`.)
 
 `composer install` then installs a `.githooks/pre-commit` (gitignored, regenerated on every install/update) that runs the check when `vendor/composer/` is staged, and points `core.hooksPath` at it. Override a block intentionally with `git commit --no-verify`.
 
@@ -34,7 +36,7 @@ Add the VCS repository and require it as a dev dependency:
 3. Run `composer dump-autoload --no-dev` to regenerate the committed production autoloader.
 4. Copy `templates/deployable.yml` to `.github/workflows/deployable.yml`.
 5. Verify with `php vendor/bin/deployable-guard check`. It should print `OK: committed autoloader is deployable as-is.`
-6. Commit `composer.json`, `composer.lock`, the workflow, the `.gitignore` change, and, if you commit `vendor/`, `vendor/composer/installed.json` and `vendor/composer/installed.php`. Do not commit `vendor/bizbudding/` or `vendor/bin/`, which stay gitignored as dev-only.
+6. Commit `composer.json`, `composer.lock`, the workflow, the `.gitignore` change, and, if you commit `vendor/`, `vendor/composer/installed.json`. **Gitignore `vendor/composer/installed.php`** — it re-stamps the current git ref on every dump (so it dirties the tree after every commit) and is never read at runtime, so tracking it only creates churn; `installed.json` is the stable record. Do not commit `vendor/bizbudding/` or `vendor/bin/`, which stay gitignored as dev-only.
 
 ## CI (the hard gate)
 
