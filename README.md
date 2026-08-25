@@ -19,11 +19,16 @@ Add the VCS repository and require it as a dev dependency:
         "bizbudding/deployable-guard": "^1"
     },
     "scripts": {
-        "post-install-cmd": [ "sh -c 'test -f vendor/bin/deployable-guard && php vendor/bin/deployable-guard install-hook || true'" ],
-        "post-update-cmd":  [ "sh -c 'test -f vendor/bin/deployable-guard && php vendor/bin/deployable-guard install-hook || true'" ]
+        "install-git-hooks": [
+            "sh -c 'test -f vendor/bin/deployable-guard && php vendor/bin/deployable-guard install-hook || true'"
+        ],
+        "post-install-cmd": [ "@install-git-hooks" ],
+        "post-update-cmd":  [ "@install-git-hooks" ]
     }
 }
 ```
+
+Naming the step as `install-git-hooks` keeps the `sh -c` string in one place and lets you reinstall the hook on its own with `composer install-git-hooks`. All 48 plugins in the fleet use this shape.
 
 The `test -f` guard is load-bearing: under `composer install --no-dev` (CI / raw-tree deploy) the dev-only guard bin is absent, so a bare `@php vendor/bin/deployable-guard install-hook` would fail with "Could not open input file" and abort the install. The guard makes it a no-op when the bin isn't there. (Do **not** add a `scripts-no-dev` key to work around this — it is not a real Composer property and fails `composer validate --strict`.)
 
@@ -31,7 +36,7 @@ The `test -f` guard is load-bearing: under `composer install --no-dev` (CI / raw
 
 ## Adopt in a plugin (step by step)
 
-1. Add the VCS repo, the `require-dev` entry, and the `post-install`/`post-update` scripts to `composer.json` (snippet above).
+1. Add the VCS repo, the `require-dev` entry, and the `install-git-hooks` / `post-install` / `post-update` scripts to `composer.json` (snippet above).
 2. Run `composer update bizbudding/deployable-guard`. This installs it, writes the lock, and runs `install-hook`, which sets `core.hooksPath=.githooks` and appends `.githooks/` to `.gitignore`.
 3. Run `composer dump-autoload --no-dev` to regenerate the committed production autoloader.
 4. Copy `templates/deployable.yml` to `.github/workflows/deployable.yml`.

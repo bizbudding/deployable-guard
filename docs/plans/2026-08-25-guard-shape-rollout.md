@@ -1,7 +1,7 @@
 # deployable-guard: one shape across the fleet
 
 **Date:** 2026-08-25
-**Status:** Shape A decided. Pilot done (springwire-publish-wp). 4 plugins remain.
+**Status:** Complete. 48 plugins on shape A, 0 at risk.
 **Scope:** `~/Plugins/*` (64 plugins), plus this package's README
 
 ## Why
@@ -69,18 +69,18 @@ Whichever wins, the README changes to document it, so the package and the fleet 
 ## Work
 
 ### 1. This package
-- [ ] Update README install block to the chosen shape.
-- [ ] Keep the `test -f` explanation and the `scripts-no-dev` warning. Both are load-bearing.
-- [ ] Keep the step-by-step adoption section, updated to match.
+- [x] README install block documents shape A, with a note on why the indirection.
+- [x] Kept the `test -f` explanation and the `scripts-no-dev` warning.
+- [x] Adoption steps updated to match.
 
 ### 2. Fix the 3 broken plugins
-- [ ] `mai-analytics`, `mai-publisher`, `tvn-newsletter`
-- [ ] Replace unguarded direct wiring with the chosen shape.
-- [ ] Confirm `composer install --no-dev` completes without aborting. This is the bug being fixed, so it is the test that matters.
+- [x] `mai-analytics` 98616d1, `mai-publisher` d457bce, `tvn-newsletter` b6d49ba, all on develop.
+- [x] All three: `composer install --no-dev` exits 0 where it previously aborted.
+- [x] Reproduced the abort with the old wiring first, so the fix is measured rather than assumed.
 
 ### 3. Adopt in the 2 springwire plugins
 - [x] `springwire-publish-wp` — done 2026-08-25, commit 25e8be9 on develop. Pilot.
-- [ ] `springwire-ingest-wp`
+- [x] `springwire-ingest-wp` — done 2026-08-25, on develop. All six checks pass.
 - [ ] Add VCS repo, `require-dev` entry, scripts.
 - [ ] `composer update bizbudding/deployable-guard`
 - [ ] `composer dump-autoload --no-dev`
@@ -132,3 +132,21 @@ Use `mai-bulk-update` for the rollout. It exists for this.
 - [ ] Import-result transient is keyed only by user ID, so a stored result can surface on a page load the viewer did not submit. Needs a per-request token threaded through the redirect. Low value, real work, deliberately deferred.
 
 Everything else from that session shipped in 0.3.0 or landed on develop after it.
+
+## Outcome, 2026-08-25
+
+Re-audited after the rollout: **48 plugins, all shape A, 0 at risk.** Was 43
+correct, 3 broken, 2 missing.
+
+Two things worth knowing for the next person:
+
+**A plugin whose only dev dependency is `deployable-guard` itself cannot fail
+the block test.** That package contributes no `autoload.files` entries, so
+`composer install` never pollutes the autoloader and there is nothing for the
+hook to catch. `mai-publisher` is in that state. The guard is installed and
+correct; the test is simply a no-op there. Do not read that as a broken hook.
+
+**`vendor/composer/installed.php` is tracked in some plugins and gitignored in
+others.** It regenerates with the current git ref, so where it is tracked the
+tree is dirty after every commit. `springwire-publish-wp` gitignores it. That
+inconsistency is out of scope here but is a real papercut.
