@@ -17,6 +17,8 @@ namespace Bizbudding\DeployableGuard;
  */
 final class DeployableChecker {
 
+	private const LOADER = 'maithemewp/mai-package-loader';
+
 	public function __construct( private string $root ) {}
 
 	/**
@@ -55,6 +57,147 @@ final class DeployableChecker {
 		}
 
 		return $missing;
+	}
+
+	/**
+	 * Relative paths a library loaded by maithemewp/mai-package-loader needs
+	 * at runtime but that are not git-tracked.
+	 *
+	 * Those libraries have no Composer autoload entry, so missing() cannot see
+	 * them. The loader finds them through each one's mai-package.php, loads the
+	 * classes it declares, and reads vendor/composer/installed.php to find them
+	 * quickly. A library is recognised from the committed installed.json by
+	 * requiring the loader, so the check works in CI, where untracked files do
+	 * not exist on disk.
+	 *
+	 * @return list<string> Empty when there is nothing to commit, or no such library.
+	 */
+	public function missing_for_loader(): array {
+		$record = $this->root . '/vendor/composer/installed.json';
+
+		if ( ! is_file( $record ) ) {
+			return [];
+		}
+
+		$data = json_decode( (string) file_get_contents( $record ), true );
+
+		if ( ! is_array( $data ) ) {
+			return [];
+		}
+
+		// Composer 2 wraps the list; Composer 1 wrote a bare list.
+		$packages = $data['packages'] ?? $data;
+		$dev      = array_fill_keys( $data['dev-package-names'] ?? [], true );
+		$tracked  = $this->tracked_files();
+		$missing  = [];
+		$found    = false;
+
+		foreach ( is_array( $packages ) ? $packages : [] as $package ) {
+			$name = $package['name'] ?? null;
+
+			if ( ! is_string( $name ) || isset( $dev[ $name ] ) || ! isset( $package['require'][ self::LOADER ] ) ) {
+				continue;
+			}
+
+			$found = true;
+			$dir   = self::normalize( 'vendor/composer/' . ( $package['install-path'] ?? '../' . $name ) );
+
+			foreach ( $this->library_paths( $dir, $tracked ) as $path ) {
+				$missing[] = $path;
+			}
+		}
+
+		if ( $found && ! isset( $tracked['vendor/composer/installed.php'] ) ) {
+			$missing[] = 'vendor/composer/installed.php';
+		}
+
+		return $missing;
+	}
+
+	/**
+	 * What one library is missing: its declaration, then the files it declares.
+	 *
+	 * @param array<string,true> $tracked
+	 * @return list<string>
+	 */
+	private function library_paths( string $dir, array $tracked ): array {
+		$declaration = $dir . '/mai-package.php';
+
+		if ( ! isset( $tracked[ $declaration ] ) ) {
+			return [ $declaration ];
+		}
+
+		$data = ( static fn( string $file ): mixed => include $file )( $this->root . '/' . $declaration );
+
+		if ( ! is_array( $data ) ) {
+			return [];
+		}
+
+		$missing = [];
+
+		foreach ( is_array( $data['classes'] ?? null ) ? $data['classes'] : [] as $file ) {
+			if ( is_string( $file ) && ! isset( $tracked[ $dir . '/' . ltrim( $file, '/' ) ] ) ) {
+				$missing[] = $dir . '/' . ltrim( $file, '/' );
+			}
+		}
+
+		if ( isset( $data['namespace'] ) && is_string( $data['path'] ?? null ) ) {
+			$path   = rtrim( $dir . '/' . trim( $data['path'], '/' ), '/' );
+			$prefix = $path . '/';
+			$any    = false;
+
+			foreach ( array_keys( $tracked ) as $file ) {
+				if ( str_starts_with( $file, $prefix ) ) {
+					$any = true;
+					break;
+				}
+			}
+
+			// In CI only tracked files exist, so a folder nobody committed
+			// shows up as nothing tracked inside it.
+			if ( ! $any ) {
+				$missing[] = $prefix;
+			}
+
+			// Locally, a file on disk that git does not track.
+			if ( is_dir( $this->root . '/' . $path ) ) {
+				$files = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $this->root . '/' . $path, \FilesystemIterator::SKIP_DOTS ) );
+
+				foreach ( $files as $file ) {
+					$rel = substr( $file->getPathname(), strlen( $this->root ) + 1 );
+
+					if ( $file->isFile() && 'php' === $file->getExtension() && ! isset( $tracked[ $rel ] ) ) {
+						$missing[] = $rel;
+					}
+				}
+			}
+		}
+
+		sort( $missing );
+
+		return array_values( array_unique( $missing ) );
+	}
+
+	/**
+	 * Resolves "." and ".." in a repo-relative path without touching disk.
+	 */
+	private static function normalize( string $path ): string {
+		$parts = [];
+
+		foreach ( explode( '/', $path ) as $part ) {
+			if ( '' === $part || '.' === $part ) {
+				continue;
+			}
+
+			if ( '..' === $part ) {
+				array_pop( $parts );
+				continue;
+			}
+
+			$parts[] = $part;
+		}
+
+		return implode( '/', $parts );
 	}
 
 	/**

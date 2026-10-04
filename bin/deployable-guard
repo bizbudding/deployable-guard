@@ -31,13 +31,23 @@
 
 	switch ( $cmd ) {
 		case 'check':
-			$missing = ( new Bizbudding\DeployableGuard\DeployableChecker( $root ) )->missing();
+			$checker = new Bizbudding\DeployableGuard\DeployableChecker( $root );
+			$missing = $checker->missing();
 			if ( $missing ) {
 				fwrite( STDERR, "\xE2\x9C\x96 Committed autoloader references files that are NOT git-tracked (not deployable as-is):\n" );
 				foreach ( $missing as $rel ) {
 					fwrite( STDERR, "  - {$rel}\n" );
 				}
 				fwrite( STDERR, "\nRegenerate without dev deps and commit:\n  composer dump-autoload --no-dev\n" );
+				exit( 1 );
+			}
+			$libraries = $checker->missing_for_loader();
+			if ( $libraries ) {
+				fwrite( STDERR, "\xE2\x9C\x96 Libraries loaded by mai-package-loader need files that are NOT git-tracked (not deployable as-is):\n" );
+				foreach ( $libraries as $rel ) {
+					fwrite( STDERR, "  - {$rel}\n" );
+				}
+				fwrite( STDERR, "\nCommit them. If .gitignore excludes vendor/composer/installed.php, remove that line.\n" );
 				exit( 1 );
 			}
 			echo "OK: committed autoloader is deployable as-is.\n";
