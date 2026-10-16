@@ -45,6 +45,16 @@ The `test -f` guard is load-bearing: under `composer install --no-dev` (CI / raw
 5. Verify with `php vendor/bin/deployable-guard check`. It should print `OK: committed autoloader is deployable as-is.`
 6. Commit `composer.json`, `composer.lock`, the workflow, the `.gitignore` change, and, if you commit `vendor/`, `vendor/composer/installed.json`. **Commit `vendor/composer/installed.php` too.** mai-package-loader reads it at runtime, and without it every page lists each plugin's library folders instead, two to three times slower. It records the plugin's current git commit, so two lines change on every `composer install` or `composer update`: commit them with the rest of the change. `composer dump-autoload` does not touch it. Do not commit `vendor/bizbudding/` or `vendor/bin/`, which stay gitignored as dev-only.
 
+## Your own checks in every plugin
+
+The installer points `core.hooksPath` at `.githooks`, so hooks set up any other way don't run in these repos. To run checks of your own as well, put a `pre-commit` and a `commit-msg` script in one folder and tell git where it is, once per machine:
+
+```sh
+git config --global deployable-guard.extraHooks /path/to/your/hooks
+```
+
+Both managed hooks run yours first. If yours exits non-zero, the commit stops. With the setting unset, or the folder missing, nothing extra runs. The folder and its scripts stay on your machine and never go in a repo.
+
 ## CI (the hard gate)
 
 Copy `templates/deployable.yml` to `.github/workflows/deployable.yml`. It checks out the committed tree (no composer build, exactly what a raw deploy sees), checks out this tool pinned to `v1`, and runs the check.
@@ -53,7 +63,7 @@ Copy `templates/deployable.yml` to `.github/workflows/deployable.yml`. It checks
 
 ```
 deployable-guard check [--root=PATH]        # exit 1 if the committed autoloader, or a loader library, is not deployable
-deployable-guard install-hook [--root=PATH] # install the pre-commit hook + set core.hooksPath
+deployable-guard install-hook [--root=PATH] # install the pre-commit and commit-msg hooks + set core.hooksPath
 ```
 
 ## Fix when it blocks you

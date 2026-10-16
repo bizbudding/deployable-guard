@@ -18,6 +18,28 @@ final class HookIntegrationTest extends TestCase {
 		exec( $g . 'init -q' );
 		exec( $g . 'config user.email t@t.t' );
 		exec( $g . 'config user.name t' );
+		// An empty local value overrides any machine-wide setting, so only the tests that set it run extra hooks.
+		exec( $g . 'config deployable-guard.extraHooks ""' );
+	}
+
+	/**
+	 * A folder of extra hooks that refuse when the staged text or the message holds "secret".
+	 */
+	private function extra_hooks(): string {
+		$dir = sys_get_temp_dir() . '/dg-extra-' . uniqid();
+		mkdir( $dir );
+		file_put_contents( $dir . '/pre-commit', "#!/bin/sh\nif git diff --cached | grep -q secret; then echo 'refused' >&2; exit 1; fi\n" );
+		file_put_contents( $dir . '/commit-msg', "#!/bin/sh\nif grep -q secret \"$1\"; then echo 'refused' >&2; exit 1; fi\n" );
+		chmod( $dir . '/pre-commit', 0755 );
+		chmod( $dir . '/commit-msg', 0755 );
+		exec( 'git -C ' . escapeshellarg( $this->root ) . ' config deployable-guard.extraHooks ' . escapeshellarg( $dir ) );
+
+		return $dir;
+	}
+
+	private function stage( string $file, string $text ): void {
+		file_put_contents( $this->root . '/' . $file, $text );
+		exec( 'git -C ' . escapeshellarg( $this->root ) . ' add ' . escapeshellarg( $file ) );
 	}
 
 	private function commit( string $msg ): int {
@@ -74,5 +96,39 @@ final class HookIntegrationTest extends TestCase {
 		);
 		exec( 'git -C ' . escapeshellarg( $this->root ) . ' add vendor/composer/autoload_files.php' );
 		self::assertSame( 0, $this->commit( 'no-binary' ), 'missing binary must skip the check, not block the commit' );
+	}
+
+	public function test_install_writes_an_executable_commit_msg_hook(): void {
+		( new HookInstaller( $this->root ) )->install();
+
+		self::assertFileExists( $this->root . '/.githooks/commit-msg' );
+		self::assertTrue( (bool) ( fileperms( $this->root . '/.githooks/commit-msg' ) & 0111 ) );
+	}
+
+	public function test_extra_hooks_refuse_staged_text_and_messages(): void {
+		( new HookInstaller( $this->root ) )->install();
+		$this->extra_hooks();
+
+		$this->stage( 'notes.md', 'a secret name' );
+		self::assertNotSame( 0, $this->commit( 'notes' ), 'the extra pre-commit refuses staged text' );
+
+		$this->stage( 'notes.md', 'nothing private' );
+		self::assertNotSame( 0, $this->commit( 'about the secret site' ), 'the extra commit-msg refuses the message' );
+		self::assertSame( 0, $this->commit( 'notes' ), 'clean text and message commit' );
+	}
+
+	public function test_without_extra_hooks_nothing_extra_runs(): void {
+		( new HookInstaller( $this->root ) )->install();
+
+		$this->stage( 'notes.md', 'a secret name' );
+		self::assertSame( 0, $this->commit( 'about the secret site' ) );
+	}
+
+	public function test_a_missing_extra_folder_does_not_block(): void {
+		( new HookInstaller( $this->root ) )->install();
+		exec( 'git -C ' . escapeshellarg( $this->root ) . ' config deployable-guard.extraHooks /nowhere/at/all' );
+
+		$this->stage( 'notes.md', 'a secret name' );
+		self::assertSame( 0, $this->commit( 'notes' ) );
 	}
 }
