@@ -7,11 +7,11 @@ v1.2.0 is released (2026-10-16, `7eaebbc`, tags `v1.2.0` and `v1` pushed). The m
 
 ## Next
 
-1. Mai Engine is on v1.2.0 and pushed. 46 other `mai-*` plugins have a local, unpushed "Update deployable-guard to v1.2.0" commit on `develop` (mai-sellers-json skipped: being archived). Push them when Mike says.
+1. Rollout done 2026-10-16: every `mai-*` plugin with the guard is on v1.2.0 and pushed to `develop`, plus mai-favorites and mai-arena-disqus, which got it new. Not on it: mai-content-areas (pre-release, builds from local path repos), mai-sellers-json (being archived), mai-user-post (unfinished).
 
 ## Blocked / waiting on
 
-Mike's go to push the plugin commits.
+Nothing.
 
 ## Verify
 
