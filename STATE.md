@@ -1,18 +1,17 @@
 # State
-Updated: 2026-10-03 by Claude (Opus 5.5)
+Updated: 2026-10-16 by Claude (Opus 5.5)
 
 ## Now
 
-`check` also covers libraries loaded by mai-package-loader: each one's `mai-package.php`, the class files it declares, and `vendor/composer/installed.php` must be committed. The README now says to commit `installed.php` instead of ignoring it, because the loader reads it at runtime. The pre-commit hook runs when anything under `vendor/`, or `.gitignore`, is staged. Committed locally on `main` (fcf19cc), not pushed or tagged.
+v1.2.0 is released (2026-10-16, `7eaebbc`, tags `v1.2.0` and `v1` pushed). The managed pre-commit runs a machine's own pre-commit first, and a new managed commit-msg hook runs its commit-msg, when `git config deployable-guard.extraHooks` names a folder of them. On Mike's Mac it points at the mai-sites-ops hooks, which refuse client and server names. Unset or missing, nothing extra runs.
 
 ## Next
 
-1. Ask Mike: push `main`, tag `v1.1.0`, and move the `v1` tag, which every plugin's CI workflow checks out.
-2. Plugins pick it up on their next `composer update bizbudding/deployable-guard`.
+1. Mai Engine is on v1.2.0 and pushed. 46 other `mai-*` plugins have a local, unpushed "Update deployable-guard to v1.2.0" commit on `develop` (mai-sellers-json skipped: being archived). Push them when Mike says.
 
 ## Blocked / waiting on
 
-Mike's yes for the push and tags.
+Mike's go to push the plugin commits.
 
 ## Verify
 
@@ -20,7 +19,7 @@ Mike's yes for the push and tags.
 composer install && vendor/bin/phpunit
 ```
 
-Expect 16 tests passing.
+Expect 20 tests passing.
 
 ## Gotchas
 
